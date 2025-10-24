@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.is;
@@ -71,5 +72,33 @@ public class TaskResourceTest {
          .body("[1].title", is(tasks.get(1).title))
          .body("[1].description", is(tasks.get(1).description))
          .body("[1].status", is(tasks.get(1).status.toString()));
+   }
+
+   @Test
+   void deleteTask_shouldReturnNotFoundIfTheTaskWithTheSuppliedIdDoesNotExists() {
+      var nonExistingId = UUID.randomUUID();
+
+      given()
+         .when()
+         .delete("/api/tasks/{id}", nonExistingId)
+         .then()
+         .statusCode(404)
+         .body(is(""));
+   }
+
+   @Test
+   void deleteTask_shouldReturnNoContentIfTheTaskWithTheSuppliedIdExists() throws Exception {
+
+      userTransaction.begin();
+      taskRepository.persist(tasks.getFirst());
+      taskRepository.flush();
+      userTransaction.commit();
+
+      given()
+         .when()
+         .delete("/api/tasks/" + tasks.getFirst().id.toString())
+         .then()
+         .statusCode(204)
+         .body(is(""));
    }
 }
