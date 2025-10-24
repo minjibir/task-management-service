@@ -1,5 +1,6 @@
 package com.minjibir.dto;
 
+import com.minjibir.model.Task;
 import com.minjibir.model.TaskStatus;
 
 import java.time.LocalDateTime;
@@ -14,4 +15,14 @@ public record TaskResponse(
    LocalDateTime createdAt,
    LocalDateTime updatedAt
 ) {
+   public static TaskResponse fromTask(Task task) {
+      return new TaskResponse(
+         task.id,
+         task.title,
+         Optional.ofNullable(task.description),
+         task.status,
+         task.createdAt,
+         task.updatedAt
+      );
+   }
 }

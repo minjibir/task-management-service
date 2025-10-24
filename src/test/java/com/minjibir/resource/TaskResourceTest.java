@@ -75,6 +75,37 @@ public class TaskResourceTest {
    }
 
    @Test
+   void getTaskById_shouldReturnNotFoundWhenNoTaskWithTheSuppliedIdExists() {
+      given()
+         .when()
+         .get("/api/tasks/{id}", UUID.randomUUID())
+         .then()
+         .statusCode(404)
+         .body(is(""));
+   }
+
+   @Test
+   void getTaskById_shouldReturnTheTaskWhenItExists() throws Exception {
+      userTransaction.begin();
+      taskRepository.persist(tasks.getFirst());
+      taskRepository.flush();
+      userTransaction.commit();
+
+      var task = tasks.getFirst();
+
+      given()
+         .when()
+         .get("/api/tasks/{id}", task.id.toString())
+         .then()
+         .statusCode(200)
+         .contentType(ContentType.JSON)
+         .body("id", is(task.id.toString()))
+         .body("title", is(task.title))
+         .body("description", is(task.description))
+         .body("status", is(task.status.toString()));
+   }
+
+   @Test
    void deleteTask_shouldReturnNotFoundIfTheTaskWithTheSuppliedIdDoesNotExists() {
       var nonExistingId = UUID.randomUUID();
 
@@ -96,7 +127,7 @@ public class TaskResourceTest {
 
       given()
          .when()
-         .delete("/api/tasks/" + tasks.getFirst().id.toString())
+         .delete("/api/tasks/{id}", tasks.getFirst().id.toString())
          .then()
          .statusCode(204)
          .body(is(""));

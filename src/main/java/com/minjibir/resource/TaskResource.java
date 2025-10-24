@@ -29,14 +29,16 @@ public class TaskResource {
          .findAll()
          .list()
          .stream()
-         .map(task -> new TaskResponse(
-            task.id,
-            task.title,
-            Optional.ofNullable(task.description),
-            task.status,
-            task.createdAt,
-            task.updatedAt
-         )).toList();
+         .map(TaskResponse::fromTask).toList();
+   }
+
+   @GET
+   @Path("/{id}")
+   public TaskResponse getTaskById(UUID id) {
+      return taskRepository
+         .findByIdOptional(id)
+         .map(TaskResponse::fromTask)
+         .orElseThrow(NotFoundException::new);
    }
 
    @DELETE
@@ -52,4 +54,5 @@ public class TaskResource {
 
       return Response.status(Response.Status.NOT_FOUND).build();
    }
+
 }
