@@ -3,6 +3,7 @@ package com.minjibir.resource;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.minjibir.dto.TaskRequest;
+import com.minjibir.dto.UpdateTaskRequest;
 import com.minjibir.model.Task;
 import com.minjibir.model.TaskStatus;
 import com.minjibir.repository.TaskRepository;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
@@ -96,7 +98,6 @@ public class TaskResourceTest {
    void getTaskById_shouldReturnTheTaskWhenItExists() throws Exception {
       userTransaction.begin();
       taskRepository.persist(tasks.getFirst());
-      taskRepository.flush();
       userTransaction.commit();
 
       var task = tasks.getFirst();
@@ -130,7 +131,6 @@ public class TaskResourceTest {
 
       userTransaction.begin();
       taskRepository.persist(tasks.getFirst());
-      taskRepository.flush();
       userTransaction.commit();
 
       given()
@@ -204,6 +204,82 @@ public class TaskResourceTest {
          .body("title", is(tasks.getFirst().title))
          .body("description", is(notNullValue()))
          .body("description", is(tasks.getFirst().description));
+   }
+
+   @Test
+   void updateTask_shouldReturnBadRequestWhenRequestBodyIsNotValid() {
+      given()
+         .when()
+         .contentType(ContentType.JSON)
+         .put(PATH)
+         .then()
+         .statusCode(400);
+   }
+
+   @Test
+   void updateTask_shouldReturnNotFoundWhenTaskIdDoesNotMatchAnyExistingTask() throws JsonProcessingException {
+      var nonExistingTask = new UpdateTaskRequest(
+         UUID.randomUUID(),
+         tasks.getFirst().title,
+         Optional.ofNullable(tasks.getFirst().description)
+      );
+
+      given()
+         .when()
+         .contentType(ContentType.JSON)
+         .body(objectMapper.writeValueAsString(nonExistingTask))
+         .put(PATH)
+         .then()
+         .statusCode(404)
+         .body(is("{\"message\": \"Task not found\"}"));
+   }
+
+
+   @Test
+   void updateTask_shouldReturnConflictWhenTaskWithTheSameTitleAlreadyExists() throws Exception {
+      userTransaction.begin();
+      taskRepository.persist(tasks);
+      userTransaction.commit();
+
+      var existingTask = new UpdateTaskRequest(
+         tasks.getFirst().id,
+         tasks.get(1).title,
+         Optional.ofNullable(tasks.getFirst().description)
+      );
+
+      given()
+         .when()
+         .contentType(ContentType.JSON)
+         .body(objectMapper.writeValueAsString(existingTask))
+         .put(PATH)
+         .then()
+         .statusCode(409)
+         .body(is("{\"message\": \"Task with the same title already exists\"}"));
+   }
+
+   @Test
+   void updateTask_shouldReturnOkWhenSuccessful() throws Exception {
+      userTransaction.begin();
+      taskRepository.persist(tasks.getFirst());
+      userTransaction.commit();
+
+      var updatedTask = new UpdateTaskRequest(
+         tasks.getFirst().id,
+         "Updated Task Title",
+         Optional.of("Updated Task Description")
+      );
+
+      given()
+         .when()
+         .contentType(ContentType.JSON)
+         .body(objectMapper.writeValueAsString(updatedTask))
+         .put(PATH)
+         .then()
+         .statusCode(200)
+         .body("id", is(tasks.getFirst().id.toString()))
+         .body("title", is(updatedTask.title()))
+         .body("description", is(updatedTask.description().orElse(null)))
+         .body("updatedAt", not(tasks.getFirst().updatedAt.toString()));
    }
 
 }
