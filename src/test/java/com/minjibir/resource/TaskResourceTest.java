@@ -1,12 +1,15 @@
 package com.minjibir.resource;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.minjibir.dto.TaskRequest;
 import com.minjibir.model.Task;
+import com.minjibir.model.TaskStatus;
 import com.minjibir.repository.TaskRepository;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
-import jakarta.transaction.Transactional;
-import jakarta.transaction.UserTransaction;
+import jakarta.transaction.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -14,10 +17,15 @@ import java.util.List;
 import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
-import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.*;
 
 @QuarkusTest
 public class TaskResourceTest {
+
+   public static final String PATH = "/api/tasks";
+
+   @Inject
+   ObjectMapper objectMapper;
 
    @Inject
    TaskRepository taskRepository;
@@ -46,7 +54,7 @@ public class TaskResourceTest {
    void getAllTasks_shouldReturnEmptyWhenNoTaskIsAvailable() {
       given()
          .when()
-         .get("/api/tasks")
+         .get(PATH)
          .then()
          .statusCode(200)
          .contentType(ContentType.JSON)
@@ -61,7 +69,7 @@ public class TaskResourceTest {
 
       given()
          .when()
-         .get("/api/tasks")
+         .get(PATH)
          .then()
          .statusCode(200)
          .contentType(ContentType.JSON)
@@ -78,7 +86,7 @@ public class TaskResourceTest {
    void getTaskById_shouldReturnNotFoundWhenNoTaskWithTheSuppliedIdExists() {
       given()
          .when()
-         .get("/api/tasks/{id}", UUID.randomUUID())
+         .get(PATH + "/{id}", UUID.randomUUID())
          .then()
          .statusCode(404)
          .body(is(""));
@@ -95,7 +103,7 @@ public class TaskResourceTest {
 
       given()
          .when()
-         .get("/api/tasks/{id}", task.id.toString())
+         .get(PATH + "/{id}", task.id.toString())
          .then()
          .statusCode(200)
          .contentType(ContentType.JSON)
@@ -111,7 +119,7 @@ public class TaskResourceTest {
 
       given()
          .when()
-         .delete("/api/tasks/{id}", nonExistingId)
+         .delete(PATH + "/{id}", nonExistingId)
          .then()
          .statusCode(404)
          .body(is(""));
@@ -127,9 +135,75 @@ public class TaskResourceTest {
 
       given()
          .when()
-         .delete("/api/tasks/{id}", tasks.getFirst().id.toString())
+         .delete(PATH + "/{id}", tasks.getFirst().id.toString())
          .then()
          .statusCode(204)
          .body(is(""));
    }
+
+   @Test
+   void createTask_shouldReturnBadRequestWhenRequestBodyIsNotValid() {
+      given()
+         .when()
+         .contentType(ContentType.JSON)
+         .post(PATH)
+         .then()
+         .statusCode(400);
+   }
+
+   @Test
+   void createTask_shouldReturnConflictIfTaskWithTheSameTitleAlreadyExists() throws Exception {
+      userTransaction.begin();
+      taskRepository.persistAndFlush(tasks.getFirst());
+      userTransaction.commit();
+
+      var taskRequest = new TaskRequest(tasks.getFirst().title, "Task Description");
+
+      given()
+         .when()
+         .body(objectMapper.writeValueAsString(taskRequest))
+         .contentType(ContentType.JSON)
+         .post(PATH)
+         .then()
+         .statusCode(409)
+         .body(is("{\"message\": \"Task with the same title already exists\"}"));
+   }
+
+   @Test
+   void createTask_shouldSuccessfullyCreateNewTaskWithOnlyTitle() throws JsonProcessingException {
+      var taskRequest = new TaskRequest(tasks.getFirst().title, null);
+
+      given()
+         .when()
+         .body(objectMapper.writeValueAsString(taskRequest))
+         .contentType(ContentType.JSON)
+         .post(PATH)
+         .then()
+         .statusCode(201)
+         .body("id", notNullValue())
+         .body("createdAt", notNullValue())
+         .body("updatedAt", notNullValue())
+         .body("status", is(TaskStatus.PENDING.toString()))
+         .body("title", is(taskRequest.title()))
+         .body("description", is(nullValue()));
+   }
+
+   @Test
+   void createTask_shouldSuccessfullyCreateNewTaskWithTitleAndDescription() throws JsonProcessingException {
+      given()
+         .when()
+         .body(objectMapper.writeValueAsString(tasks.getFirst()))
+         .contentType(ContentType.JSON)
+         .post(PATH)
+         .then()
+         .statusCode(201)
+         .body("id", notNullValue())
+         .body("createdAt", notNullValue())
+         .body("updatedAt", notNullValue())
+         .body("status", is(TaskStatus.PENDING.toString()))
+         .body("title", is(tasks.getFirst().title))
+         .body("description", is(notNullValue()))
+         .body("description", is(tasks.getFirst().description));
+   }
+
 }
