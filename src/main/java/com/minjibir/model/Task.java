@@ -2,13 +2,11 @@ package com.minjibir.model;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
-import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@DynamicUpdate
 public class Task extends PanacheEntityBase {
    @Id
    @Column(columnDefinition = "uuid", nullable = false, updatable = false)

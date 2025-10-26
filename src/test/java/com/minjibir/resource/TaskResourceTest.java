@@ -3,14 +3,14 @@ package com.minjibir.resource;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.minjibir.dto.TaskRequest;
-import com.minjibir.dto.UpdateTaskRequest;
 import com.minjibir.model.Task;
 import com.minjibir.model.TaskStatus;
 import com.minjibir.repository.TaskRepository;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
-import jakarta.transaction.*;
+import jakarta.transaction.Transactional;
+import jakarta.transaction.UserTransaction;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -91,7 +91,8 @@ public class TaskResourceTest {
          .get(PATH + "/{id}", UUID.randomUUID())
          .then()
          .statusCode(404)
-         .body(is(""));
+         .body("status", is("ERROR"))
+         .body("message", is("Task with the id does not exist"));
    }
 
    @Test
@@ -123,7 +124,8 @@ public class TaskResourceTest {
          .delete(PATH + "/{id}", nonExistingId)
          .then()
          .statusCode(404)
-         .body(is(""));
+         .body("status", is("ERROR"))
+         .body("message", is("Task with the id does not exist"));
    }
 
    @Test
@@ -142,13 +144,59 @@ public class TaskResourceTest {
    }
 
    @Test
-   void createTask_shouldReturnBadRequestWhenRequestBodyIsNotValid() {
+   void createTask_shouldReturnBadRequestWhenRequestBodyIsEmpty() {
       given()
          .when()
          .contentType(ContentType.JSON)
          .post(PATH)
          .then()
-         .statusCode(400);
+         .statusCode(400)
+         .body("status", is("ERROR"))
+         .body("message", is("Invalid request body"))
+         .body("data[0]", is("Request body cannot be empty"));
+   }
+
+   @Test
+   void createTask_shouldReturnBadRequestWhenTitleIsNotSupplied() {
+      given()
+         .when()
+         .contentType(ContentType.JSON)
+         .body("{\"description\": \"Task Description\"}")
+         .post(PATH)
+         .then()
+         .statusCode(400)
+         .body("status", is("ERROR"))
+         .body("message", is("Invalid request body"))
+         .body("data[0]", is("Title must not be empty"));
+   }
+
+   @Test
+   void createTask_shouldReturnBadRequestWhenTitleIsLessThan3Characters() {
+      given()
+         .when()
+         .contentType(ContentType.JSON)
+         .body("{\"title\": \"ab\", \"description\": \"Task Description\"}")
+         .post(PATH)
+         .then()
+         .statusCode(400)
+         .body("status", is("ERROR"))
+         .body("message", is("Invalid request body"))
+         .body("data[0]", is("Title must be between 3 and 200 characters"));
+   }
+
+   @Test
+   void createTask_shouldReturnBadRequestWhenTitleIsMoreThan200Characters() {
+
+      given()
+         .when()
+         .contentType(ContentType.JSON)
+         .body("{\"title\": \"" + "a".repeat(201) + "\", \"description\": \"Task Description\"}")
+         .post(PATH)
+         .then()
+         .statusCode(400)
+         .body("status", is("ERROR"))
+         .body("message", is("Invalid request body"))
+         .body("data[0]", is("Title must be between 3 and 200 characters"));
    }
 
    @Test
@@ -157,7 +205,7 @@ public class TaskResourceTest {
       taskRepository.persistAndFlush(tasks.getFirst());
       userTransaction.commit();
 
-      var taskRequest = new TaskRequest(tasks.getFirst().title, "Task Description");
+      var taskRequest = new TaskRequest(tasks.getFirst().title, Optional.of("Task Description"));
 
       given()
          .when()
@@ -166,7 +214,8 @@ public class TaskResourceTest {
          .post(PATH)
          .then()
          .statusCode(409)
-         .body(is("{\"message\": \"Task with the same title already exists\"}"));
+         .body("status", is("ERROR"))
+         .body("message", is("Task with the same title already exists"));
    }
 
    @Test
@@ -207,19 +256,8 @@ public class TaskResourceTest {
    }
 
    @Test
-   void updateTask_shouldReturnBadRequestWhenRequestBodyIsNotValid() {
-      given()
-         .when()
-         .contentType(ContentType.JSON)
-         .put(PATH)
-         .then()
-         .statusCode(400);
-   }
-
-   @Test
    void updateTask_shouldReturnNotFoundWhenTaskIdDoesNotMatchAnyExistingTask() throws JsonProcessingException {
-      var nonExistingTask = new UpdateTaskRequest(
-         UUID.randomUUID(),
+      var nonExistingTask = new TaskRequest(
          tasks.getFirst().title,
          Optional.ofNullable(tasks.getFirst().description)
       );
@@ -228,12 +266,12 @@ public class TaskResourceTest {
          .when()
          .contentType(ContentType.JSON)
          .body(objectMapper.writeValueAsString(nonExistingTask))
-         .put(PATH)
+         .put(PATH + "/{id}", UUID.randomUUID())
          .then()
          .statusCode(404)
-         .body(is("{\"message\": \"Task not found\"}"));
+         .body("status", is("ERROR"))
+         .body("message", is("Task not found"));
    }
-
 
    @Test
    void updateTask_shouldReturnConflictWhenTaskWithTheSameTitleAlreadyExists() throws Exception {
@@ -241,8 +279,7 @@ public class TaskResourceTest {
       taskRepository.persist(tasks);
       userTransaction.commit();
 
-      var existingTask = new UpdateTaskRequest(
-         tasks.getFirst().id,
+      var existingTask = new TaskRequest(
          tasks.get(1).title,
          Optional.ofNullable(tasks.getFirst().description)
       );
@@ -251,10 +288,11 @@ public class TaskResourceTest {
          .when()
          .contentType(ContentType.JSON)
          .body(objectMapper.writeValueAsString(existingTask))
-         .put(PATH)
+         .put(PATH + "/{id}", tasks.getFirst().id.toString())
          .then()
          .statusCode(409)
-         .body(is("{\"message\": \"Task with the same title already exists\"}"));
+         .body("status", is("ERROR"))
+         .body("message", is("Task with the same title already exists"));
    }
 
    @Test
@@ -263,8 +301,7 @@ public class TaskResourceTest {
       taskRepository.persist(tasks.getFirst());
       userTransaction.commit();
 
-      var updatedTask = new UpdateTaskRequest(
-         tasks.getFirst().id,
+      var updatedTask = new TaskRequest(
          "Updated Task Title",
          Optional.of("Updated Task Description")
       );
@@ -273,7 +310,7 @@ public class TaskResourceTest {
          .when()
          .contentType(ContentType.JSON)
          .body(objectMapper.writeValueAsString(updatedTask))
-         .put(PATH)
+         .put(PATH + "/{id}", tasks.getFirst().id.toString())
          .then()
          .statusCode(200)
          .body("id", is(tasks.getFirst().id.toString()))

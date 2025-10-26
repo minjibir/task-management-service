@@ -2,12 +2,12 @@ package com.minjibir.resource;
 
 import com.minjibir.dto.TaskRequest;
 import com.minjibir.dto.TaskResponse;
-import com.minjibir.dto.UpdateTaskRequest;
-import com.minjibir.model.Task;
+import com.minjibir.exception.DuplicateTaskException;
 import com.minjibir.repository.TaskRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -16,7 +16,6 @@ import jakarta.ws.rs.core.Response;
 import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Path("tasks")
@@ -43,36 +42,32 @@ public class TaskResource {
       return taskRepository
          .findByIdOptional(id)
          .map(TaskResponse::fromTask)
-         .orElseThrow(NotFoundException::new);
+         .orElseThrow(() -> new NotFoundException("Task with the id does not exist"));
    }
 
    @DELETE
    @Path("/{id}")
    @Transactional
    public Response deleteTask(UUID id) {
-      Optional<Task> optTask = taskRepository.findByIdOptional(id);
-
-      if (optTask.isPresent()) {
-         taskRepository.deleteById(id);
-         return Response.noContent().build();
-      }
-
-      return Response.status(Response.Status.NOT_FOUND).build();
+      return taskRepository
+         .findByIdOptional(id)
+         .map(t -> {
+            taskRepository.deleteById(t.id);
+            return Response.noContent().build();
+         })
+         .orElseThrow(() -> new NotFoundException("Task with the id does not exist"));
    }
 
 
    @POST
    @Transactional
-   public Response createTask(@NotNull TaskRequest request) {
+   public Response createTask(@NotNull(message = "Request body cannot be empty") @Valid TaskRequest request) {
       if (taskRepository.findByTitle(request.title()).isPresent())
-         return Response
-            .status(Response.Status.CONFLICT)
-            .entity("{\"message\": \"Task with the same title already exists\"}")
-            .build();
+         throw new DuplicateTaskException("Task with the same title already exists");
 
       var task = request.toTask();
 
-      taskRepository.persistAndFlush(task);
+      taskRepository.persist(task);
 
       return Response
          .created(URI.create("/api/tasks/" + task.id))
@@ -81,29 +76,25 @@ public class TaskResource {
    }
 
    @PUT
+   @Path("/{id}")
    @Transactional
-   public Response updateTask(@NotNull UpdateTaskRequest request) {
-      var task = taskRepository.findById(request.id());
+   public Response updateTask(@PathParam("id") UUID id, @NotNull(message = "Request body cannot be empty") @Valid TaskRequest request) {
+      return taskRepository
+         .findByIdOptional(id)
+         .map(t -> {
+            taskRepository
+               .findByTitle(request.title())
+               .ifPresent(existing -> {
+                  if (!existing.id.equals(t.id))
+                     throw new DuplicateTaskException("Task with the same title already exists");
+               });
 
-      if (task != null && task.id == request.id()) {
-         if (taskRepository.findByTitle(request.title()).isPresent()) {
-            return Response
-               .status(Response.Status.CONFLICT)
-               .entity("{\"message\": \"Task with the same title already exists\"}")
-               .build();
-         } else {
-            task.title = request.title();
-            task.description = request.description().orElse(null);
-            task.updatedAt = LocalDateTime.now();
+            t.title = request.title();
+            request.description().ifPresent(v -> t.description = v);
 
-            return Response.ok(TaskResponse.fromTask(task)).build();
-         }
-      }
-
-      return Response
-         .status(Response.Status.NOT_FOUND)
-         .entity("{\"message\": \"Task not found\"}")
-         .build();
+            return Response.ok(TaskResponse.fromTask(t)).build();
+         })
+         .orElseThrow(() -> new NotFoundException("Task not found"));
    }
 
 }
