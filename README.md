@@ -1,22 +1,42 @@
-# Task Management Service
+# **Task Management Service**
 
-This is Java based microservice for managing tasks, built with Quarkus. It provides a RESTful API
-for creating, updating, retrieving, and deleting tasks.
+This project is a microservice for managing tasks. It provides a simple RESTful API for creating, retrieving, updating, and deleting tasks. It is designed to run as a stand-alone, containerized backend, making it easy to deploy and connect to any front-end application.
 
-This service is built as a native executable and containerized to run entirely within Docker, with a PostgreSQL database
-for persistence and Flyway for schema management.
+## Tech Stack & Design Decisions
 
-## Tech Stack & Design
+This section provides an overview of the technology used and the key architectural decisions made.
 
-* **Framework:** Quarkus (for high-performance, low-memory native executables)
+### Tech Stack
+
+* **Framework:** Quarkus
 * **Language:** Java 21
-* **Database:** PostgreSQL (LTS version 17)
-* **Persistence:** Hibernate ORM with the Panache Repository pattern
-* **Database Migrations:** Flyway (for version-controlled schema)
-* **Containerization:** Docker & Docker Compose
-* **API Documentation:** OpenAPI (Swagger UI) is automatically generated.
-* **Design:** Task uniqueness is enforced by a `UNIQUE` constraint in the database. All development, testing, and
-  production environments are configured to use Flyway for a consistent schema.
+* **Database:** PostgreSQL 17 (LTS)
+* **Persistence:** Hibernate ORM (Panache) & Flyway
+* **API:** RESTful (JAX-RS)
+* **API Documentation:** OpenAPI (Swagger UI)
+
+### Design Decisions
+
+#### API Design: RESTful
+
+A RESTful API was chosen over other patterns (like gRPC) for several key reasons:
+
+* **Simplicity & Client Experience:** As this is a consumer-facing API, REST is universally supported and provides the simplest integration experience for web or mobile clients.
+* **Simple Workflow:** The service's operations are simple request-response, which does not require the performance benefits or complex streaming capabilities of gRPC.
+* **Browser-Native:** REST is natively supported by browsers, making it the natural choice for a service that will be consumed by a front-end application.
+
+#### Framework: Quarkus
+
+Quarkus was selected as the ideal framework for this project's container-first requirement.
+
+* **Container-First:** Quarkus is specifically designed to build lightweight, fast-booting native executables, making it perfect for efficient Docker deployments.
+* **Developer Experience:** It provides a familiar development model (based on Jakarta EE standards) while adding powerful features.
+* **Integrated Tooling:** It includes out-of-the-box support for generating container images and native executables, which simplified the build process.
+* **Out-of-the-Box OpenAPI:** The OpenAPI (Swagger UI) documentation is generated automatically via an extension, fulfilling the client generation requirement with minimal configuration.
+
+#### Architecture: Simple & Focused
+
+Given the straightforward nature of the domain (CRUD for tasks), the service implements a "Transaction Script" pattern. This means the business logic is handled directly within the resource layer (`TaskResource`), avoiding unnecessary layers of abstraction or the complexity of a full Domain-Driven Design (DDD) approach.
 
 ## Prerequisites
 
@@ -34,7 +54,7 @@ Follow these three steps to get the entire application running.
 
 ### 1. Configure Credentials
 
-The application requires database credentials, which are managed using a `.env` file. This file is ignored by Git.
+The application requires database credentials, which are managed using a `.env` file.
 
 Create the file:
 
@@ -69,7 +89,7 @@ This command will compile the application, run all tests, build a native Linux e
 ```
 
 ### 3. Run with Docker Compose
-Now, you can start the entire stack (your app and the database) with a single command:
+Now, you can start the entire stack (the app and the database) with a single command:
 
 ```bash
 docker compose up -d
@@ -84,8 +104,7 @@ To stop and remove the containers, run:
 docker compose down
 ```
 
-## API Documentation & Examples
-Interactive API (Swagger UI)
+## API Documentation
 For complete, interactive API documentation where you can try out every endpoint, run the service and navigate to the Swagger UI in your browser:
 
 * [http://localhost:8080/q/swagger-ui](http://localhost:8080/q/swagger-ui)
@@ -99,6 +118,8 @@ The specification is available at:
 
 * [http://localhost:8080/q/openapi](http://localhost:8080/q/openapi)
 
+### Quick Examples
+Here are a few curl examples for common operations.
 
 ### Quick Examples
 Here are a few curl examples for common operations.
