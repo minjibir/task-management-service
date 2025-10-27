@@ -1,0 +1,32 @@
+services:
+  app:
+    image: docker.io/jabirminjibir/task-management-service:latest
+    container_name: task-management-service
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    environment:
+      QUARKUS_PROFILE: prod
+      DATASOURCE_USERNAME: ${DATASOURCE_USERNAME}
+      DATASOURCE_PASSWORD: ${DATASOURCE_PASSWORD}
+
+  db:
+    image: docker.io/postgres:17-alpine
+    container_name: task-management-service-db
+    restart: unless-stopped
+    volumes:
+      - ./data/postgres_data:/var/lib/postgresql/data # Externally mapped the data directory for easy extraction/export (portability).
+    ports:
+      - "5432:5432" # This is mapped only for external tools and potentially monitoring. The app and the container are on the same network, therefore there is no need to expose it. In case of a conflict, you can simply remove it.
+    environment:
+      POSTGRES_PASSWORD: ${DATASOURCE_PASSWORD}
+      POSTGRES_USER: ${DATASOURCE_USERNAME} # Could use a different user, but has be the same for `application.properties` and docker-compose.yml
+      POSTGRES_DB: task-management-service-db
+      PGDATA: /var/lib/postgresql/data/pgdata
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DATASOURCE_USERNAME} -d task-management-service-db" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
