@@ -2,6 +2,7 @@ package com.minjibir.resource;
 
 import com.minjibir.dto.TaskRequest;
 import com.minjibir.dto.TaskResponse;
+import com.minjibir.dto.UpdateTaskRequest;
 import com.minjibir.exception.DuplicateTaskException;
 import com.minjibir.repository.TaskRepository;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -14,7 +15,6 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 import java.net.URI;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -67,7 +67,7 @@ public class TaskResource {
 
       var task = request.toTask();
 
-      taskRepository.persist(task);
+      taskRepository.persistAndFlush(task);
 
       return Response
          .created(URI.create("/api/tasks/" + task.id))
@@ -78,7 +78,7 @@ public class TaskResource {
    @PUT
    @Path("/{id}")
    @Transactional
-   public Response updateTask(@PathParam("id") UUID id, @NotNull(message = "Request body cannot be empty") @Valid TaskRequest request) {
+   public Response updateTask(@PathParam("id") UUID id, @NotNull(message = "Request body cannot be empty") @Valid UpdateTaskRequest request) {
       return taskRepository
          .findByIdOptional(id)
          .map(t -> {
@@ -91,6 +91,8 @@ public class TaskResource {
 
             t.title = request.title();
             request.description().ifPresent(v -> t.description = v);
+            request.status().ifPresent(s -> t.status = s);
+            taskRepository.flush();
 
             return Response.ok(TaskResponse.fromTask(t)).build();
          })

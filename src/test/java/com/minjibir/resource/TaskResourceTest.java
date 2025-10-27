@@ -3,6 +3,7 @@ package com.minjibir.resource;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.minjibir.dto.TaskRequest;
+import com.minjibir.dto.UpdateTaskRequest;
 import com.minjibir.model.Task;
 import com.minjibir.model.TaskStatus;
 import com.minjibir.repository.TaskRepository;
@@ -239,9 +240,14 @@ public class TaskResourceTest {
 
    @Test
    void createTask_shouldSuccessfullyCreateNewTaskWithTitleAndDescription() throws JsonProcessingException {
+      var taskRequest = new TaskRequest(
+         tasks.getFirst().title,
+         Optional.of(tasks.getFirst().description)
+      );
+
       given()
          .when()
-         .body(objectMapper.writeValueAsString(tasks.getFirst()))
+         .body(objectMapper.writeValueAsString(taskRequest))
          .contentType(ContentType.JSON)
          .post(PATH)
          .then()
@@ -257,15 +263,16 @@ public class TaskResourceTest {
 
    @Test
    void updateTask_shouldReturnNotFoundWhenTaskIdDoesNotMatchAnyExistingTask() throws JsonProcessingException {
-      var nonExistingTask = new TaskRequest(
+      var updateTaskRequest = new UpdateTaskRequest(
          tasks.getFirst().title,
-         Optional.ofNullable(tasks.getFirst().description)
+         Optional.ofNullable(tasks.getFirst().description),
+         Optional.empty()
       );
 
       given()
          .when()
          .contentType(ContentType.JSON)
-         .body(objectMapper.writeValueAsString(nonExistingTask))
+         .body(objectMapper.writeValueAsString(updateTaskRequest))
          .put(PATH + "/{id}", UUID.randomUUID())
          .then()
          .statusCode(404)
@@ -279,15 +286,16 @@ public class TaskResourceTest {
       taskRepository.persist(tasks);
       userTransaction.commit();
 
-      var existingTask = new TaskRequest(
+      var updateTaskRequest = new UpdateTaskRequest(
          tasks.get(1).title,
-         Optional.ofNullable(tasks.getFirst().description)
+         Optional.ofNullable(tasks.getFirst().description),
+         Optional.empty()
       );
 
       given()
          .when()
          .contentType(ContentType.JSON)
-         .body(objectMapper.writeValueAsString(existingTask))
+         .body(objectMapper.writeValueAsString(updateTaskRequest))
          .put(PATH + "/{id}", tasks.getFirst().id.toString())
          .then()
          .statusCode(409)
@@ -301,9 +309,10 @@ public class TaskResourceTest {
       taskRepository.persist(tasks.getFirst());
       userTransaction.commit();
 
-      var updatedTask = new TaskRequest(
+      var updatedTask = new UpdateTaskRequest(
          "Updated Task Title",
-         Optional.of("Updated Task Description")
+         Optional.of("Updated Task Description"),
+         Optional.of(TaskStatus.COMPLETED)
       );
 
       given()
@@ -316,7 +325,8 @@ public class TaskResourceTest {
          .body("id", is(tasks.getFirst().id.toString()))
          .body("title", is(updatedTask.title()))
          .body("description", is(updatedTask.description().orElse(null)))
-         .body("updatedAt", not(tasks.getFirst().updatedAt.toString()));
+         .body("updatedAt", not(tasks.getFirst().updatedAt.toString()))
+         .body("status", is("COMPLETED"));
    }
 
 }

@@ -2,11 +2,14 @@ package com.minjibir.model;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
+@Table(name = "tasks")
 public class Task extends PanacheEntityBase {
    @Id
    @Column(columnDefinition = "uuid", nullable = false, updatable = false)
@@ -22,10 +25,12 @@ public class Task extends PanacheEntityBase {
    @Enumerated(EnumType.STRING)
    public TaskStatus status;
 
-   @Column(nullable = false, updatable = false)
+   @CreationTimestamp
+   @Column(name = "created_at", nullable = false, updatable = false)
    public LocalDateTime createdAt;
 
-   @Column(nullable = false)
+   @UpdateTimestamp
+   @Column(name = "updated_at", nullable = false)
    public LocalDateTime updatedAt;
 
    public Task() {
@@ -35,12 +40,5 @@ public class Task extends PanacheEntityBase {
       this.title = title;
       this.description = description;
       this.status = TaskStatus.PENDING;
-      this.createdAt = LocalDateTime.now();
-      this.updatedAt = LocalDateTime.now();
-   }
-
-   @PreUpdate
-   public void preUpdate() {
-      this.updatedAt = LocalDateTime.now();
    }
 }

@@ -10,7 +10,7 @@ public class DuplicateTaskExceptionMapper implements ExceptionMapper<DuplicateTa
    @Override
    public jakarta.ws.rs.core.Response toResponse(DuplicateTaskException e) {
       return Response
-         .status(e.getResponse().getStatus())
+         .status(Response.Status.CONFLICT)
          .entity(new ApiErrorResponse(e.getMessage()))
          .build();
    }
