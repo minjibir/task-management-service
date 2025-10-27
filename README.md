@@ -118,6 +118,8 @@ The specification is available at:
 
 * [http://localhost:8080/q/openapi](http://localhost:8080/q/openapi)
 
+### Quick Examples
+Here are a few curl examples for common operations.
 
 ### Quick Examples
 Here are a few curl examples for common operations.
